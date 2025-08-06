@@ -1,47 +1,41 @@
-from flask import Flask, request, jsonify, render_template
-import json
-import os
+from flask import Flask, render_template, request, jsonify
+import sqlite3
 
 app = Flask(__name__)
 
-REGISTROS_PATH = "registros.json"
+# Crear la base de datos si no existe
+def init_db():
+    with sqlite3.connect("usuarios.db") as conn:
+        conn.execute('''CREATE TABLE IF NOT EXISTS usuarios (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            nombre TEXT NOT NULL,
+                            rut TEXT NOT NULL UNIQUE,
+                            saldo INTEGER DEFAULT 200
+                        )''')
+init_db()
 
-# Cargar o crear base de datos
-if not os.path.exists(REGISTROS_PATH):
-    with open(REGISTROS_PATH, "w") as f:
-        json.dump([], f)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-def cargar_registros():
-    with open(REGISTROS_PATH, "r") as f:
-        return json.load(f)
-
-def guardar_registros(registros):
-    with open(REGISTROS_PATH, "w") as f:
-        json.dump(registros, f, indent=2)
-
-@app.route("/")
-def home():
-    return render_template("index.html")
-
-@app.route("/consultar", methods=["POST"])
+@app.route('/consultar', methods=['POST'])
 def consultar():
     data = request.get_json()
-    rut = data.get("rut")
-    registros = cargar_registros()
-    for registro in registros:
-        if registro["rut"] == rut:
-            return jsonify(registro)
-    return jsonify({"error": "RUT no encontrado"}), 404
+    rut = data.get('rut')
 
-@app.route("/actualizar", methods=["POST"])
-def actualizar():
-    data = request.get_json()
-    rut = data.get("rut")
-    paginas_usadas = data.get("paginas_usadas")
-    registros = cargar_registros()
-    for registro in registros:
-        if registro["rut"] == rut:
-            registro["paginas_restantes"] -= paginas_usadas
-            guardar_registros(registros)
-            return jsonify({"mensaje": "Actualizado correctamente"})
-    return jsonify({"error": "RUT no encontrado"}), 404
+    if not rut:
+        return jsonify({'error': 'RUT no proporcionado'}), 400
+
+    with sqlite3.connect("usuarios.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre, saldo FROM usuarios WHERE rut = ?", (rut,))
+        resultado = cursor.fetchone()
+
+    if resultado:
+        nombre, saldo = resultado
+        return jsonify({'nombre': nombre, 'saldo': saldo})
+    else:
+        return jsonify({'error': 'RUT no encontrado'}), 404
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000)
