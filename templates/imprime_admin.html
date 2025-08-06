@@ -2,9 +2,9 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Impresión Prepago</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" />
 </head>
 <body class="bg-light">
   <div class="container mt-5">
@@ -12,7 +12,7 @@
 
     <div class="mb-3">
       <label for="rut" class="form-label">Ingrese RUT</label>
-      <input type="text" class="form-control" id="rut" placeholder="Ej: 12345678-9">
+      <input type="text" class="form-control" id="rut" placeholder="Ej: 12345678-9" />
     </div>
     <button class="btn btn-success mb-3" onclick="consultarUsuario()">Consultar</button>
 
@@ -22,12 +22,12 @@
 
       <div class="mb-3">
         <label for="paginas" class="form-label">Cantidad de Páginas a Imprimir</label>
-        <input type="number" class="form-control" id="paginas" min="1">
+        <input type="number" class="form-control" id="paginas" min="1" />
       </div>
 
       <div class="mb-3">
         <label for="concepto" class="form-label">Concepto</label>
-        <input type="text" class="form-control" id="concepto" placeholder="Ej: Impresión de informe">
+        <input type="text" class="form-control" id="concepto" placeholder="Ej: Impresión de informe" />
       </div>
 
       <button class="btn btn-primary" onclick="confirmarImpresion()">OK</button>
@@ -37,42 +37,79 @@
   </div>
 
   <script>
-    const backendUrl = "https://prepago.onrender.com/"; // <-- Cambiar según tu URL
+    const backendUrl = ""; // Si frontend y backend están en el mismo dominio, déjalo vacío.
 
     async function consultarUsuario() {
-      const rut = document.getElementById("rut").value;
-      const respuesta = await fetch(`${backendUrl}/consulta/${rut}`);
-      const datos = await respuesta.json();
+      const rut = document.getElementById("rut").value.trim();
+      if (!rut) {
+        mostrarMensaje("Por favor ingresa un RUT válido.", "danger");
+        return;
+      }
 
-      const mensaje = document.getElementById("mensaje");
-      mensaje.innerHTML = "";
+      try {
+        const respuesta = await fetch(`${backendUrl}/consultar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rut }),
+        });
 
-      if (respuesta.ok) {
-        document.getElementById("nombreUsuario").textContent = datos.nombre;
-        document.getElementById("saldoPaginas").textContent = datos.saldo;
-        document.getElementById("datosUsuario").style.display = "block";
-      } else {
-        document.getElementById("datosUsuario").style.display = "none";
-        mensaje.innerHTML = `<div class="alert alert-danger">${datos.error}</div>`;
+        const datos = await respuesta.json();
+
+        if (respuesta.ok) {
+          document.getElementById("nombreUsuario").textContent = datos.nombre;
+          document.getElementById("saldoPaginas").textContent = datos.saldo;
+          document.getElementById("datosUsuario").style.display = "block";
+          mostrarMensaje("", "");
+        } else {
+          document.getElementById("datosUsuario").style.display = "none";
+          mostrarMensaje(datos.error, "danger");
+        }
+      } catch (error) {
+        mostrarMensaje("Error al conectar con el servidor.", "danger");
       }
     }
 
-    function confirmarImpresion() {
-      const paginas = parseInt(document.getElementById("paginas").value);
+    async function confirmarImpresion() {
+      const paginasInput = document.getElementById("paginas");
+      const paginas = parseInt(paginasInput.value);
       const saldo = parseInt(document.getElementById("saldoPaginas").textContent);
+      const rut = document.getElementById("rut").value.trim();
+      const concepto = document.getElementById("concepto").value.trim();
 
-      const mensaje = document.getElementById("mensaje");
+      if (!paginas || paginas <= 0) {
+        mostrarMensaje("Ingresa una cantidad válida de páginas.", "danger");
+        return;
+      }
 
       if (paginas > saldo) {
-        mensaje.innerHTML = '<div class="alert alert-danger">Saldo insuficiente</div>';
-      } else {
+        mostrarMensaje("Saldo insuficiente.", "danger");
+        return;
+      }
+
+      try {
+        // Lógica para descontar páginas en backend no está implementada en el backend que tienes.
+        // Podrías agregar ruta /imprimir para actualizar saldo.
+        // Aquí solo mostramos confirmación local.
+
         const nuevoSaldo = saldo - paginas;
         document.getElementById("saldoPaginas").textContent = nuevoSaldo;
-        mensaje.innerHTML = `<div class="alert alert-success">Impresión confirmada. Nuevo saldo: ${nuevoSaldo} páginas</div>`;
-        // Aquí podrías enviar los cambios al backend
+        mostrarMensaje(`Impresión confirmada. Nuevo saldo: ${nuevoSaldo} páginas.`, "success");
+        paginasInput.value = "";
+        document.getElementById("concepto").value = "";
+      } catch (error) {
+        mostrarMensaje("Error al procesar la impresión.", "danger");
       }
+    }
+
+    function mostrarMensaje(texto, tipo) {
+      const div = document.getElementById("mensaje");
+      if (!texto) {
+        div.innerHTML = "";
+        div.className = "";
+        return;
+      }
+      div.innerHTML = `<div class="alert alert-${tipo}" role="alert">${texto}</div>`;
     }
   </script>
 </body>
 </html>
-
