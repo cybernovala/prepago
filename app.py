@@ -6,13 +6,11 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app)
 
-# Función para conectarse a la base de datos
 def get_db_connection():
     conn = sqlite3.connect("database.db")
     conn.row_factory = sqlite3.Row
     return conn
 
-# Inicializar base de datos si no existe
 def init_db():
     conn = get_db_connection()
     conn.execute('''
@@ -99,3 +97,7 @@ def historial(rut):
     conn.close()
     historial = [{"fecha": r["fecha"], "cambio": r["cambio"], "descripcion": r["descripcion"]} for r in rows]
     return jsonify(historial)
+
+# ESTA LÍNEA ES CLAVE PARA QUE FUNCIONE EN RENDER
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
