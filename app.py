@@ -9,48 +9,40 @@ def init_db():
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             nombre TEXT NOT NULL,
                             rut TEXT NOT NULL UNIQUE,
-                            saldo INTEGER DEFAULT 200
+                            saldo INTEGER DEFAULT 0
                         )''')
 
-def insertar_usuarios_demo():
-    usuarios_demo = [
-        ("JUAN PÉREZ", "11111111-1", 150),
-        ("MARÍA GÓMEZ", "22222222-2", 80)
-    ]
-    with sqlite3.connect("usuarios.db") as conn:
-        cursor = conn.cursor()
-        for nombre, rut, saldo in usuarios_demo:
-            try:
-                cursor.execute("INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)", (nombre, rut, saldo))
-            except sqlite3.IntegrityError:
-                pass
-        conn.commit()
-
 init_db()
-insertar_usuarios_demo()
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/consultar', methods=['POST'])
-def consultar():
+@app.route('/cargar_usuario', methods=['POST'])
+def cargar_usuario():
     data = request.get_json()
+    nombre = data.get('nombre')
     rut = data.get('rut')
+    paginas = data.get('paginas')
 
-    if not rut:
-        return jsonify({'error': 'RUT no proporcionado'}), 400
+    if not nombre or not rut or paginas is None:
+        return jsonify({'error': 'Faltan datos'}), 400
 
     with sqlite3.connect("usuarios.db") as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT nombre, saldo FROM usuarios WHERE rut = ?", (rut,))
-        resultado = cursor.fetchone()
+        cursor.execute("SELECT id FROM usuarios WHERE rut = ?", (rut,))
+        existe = cursor.fetchone()
 
-    if resultado:
-        nombre, saldo = resultado
-        return jsonify({'nombre': nombre, 'saldo': saldo})
-    else:
-        return jsonify({'error': 'RUT no encontrado'}), 404
+        if existe:
+            cursor.execute("UPDATE usuarios SET saldo = saldo + ? WHERE rut = ?", (paginas, rut))
+            mensaje = "Saldo actualizado correctamente"
+        else:
+            cursor.execute("INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)", (nombre, rut, paginas))
+            mensaje = "Usuario creado y saldo cargado"
+
+        conn.commit()
+
+    return jsonify({'mensaje': mensaje})
 
 @app.route('/consulta')
 def consulta():
