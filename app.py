@@ -20,16 +20,19 @@ init_db()
 
 @app.route('/usuarios', methods=['GET'])
 def obtener_usuarios():
-    with sqlite3.connect("usuarios.db") as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT nombre, rut, saldo FROM usuarios")
-        usuarios = cursor.fetchall()
+    try:
+        with sqlite3.connect("usuarios.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT nombre, rut, saldo FROM usuarios")
+            usuarios = cursor.fetchall()
 
-    resultado = [
-        {"nombre": nombre, "rut": rut, "saldo": saldo}
-        for nombre, rut, saldo in usuarios
-    ]
-    return jsonify(resultado)
+        resultado = [
+            {"nombre": nombre, "rut": rut, "saldo": saldo}
+            for nombre, rut, saldo in usuarios
+        ]
+        return jsonify(resultado)
+    except Exception as e:
+        return jsonify({'error': f'Error al obtener usuarios: {str(e)}'}), 500
 
 @app.route('/cargar_usuario', methods=['POST'])
 def cargar_usuario():
@@ -42,6 +45,7 @@ def cargar_usuario():
         return jsonify({'error': 'Faltan datos'}), 400
 
     try:
+        paginas = int(paginas)
         with sqlite3.connect("usuarios.db") as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
@@ -51,12 +55,14 @@ def cargar_usuario():
                 nuevo_saldo = res[0] + paginas
                 cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
             else:
-                cursor.execute("INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)",
-                               (nombre, rut, paginas))
+                cursor.execute(
+                    "INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)",
+                    (nombre, rut, paginas)
+                )
             conn.commit()
         return jsonify({'mensaje': f'Saldo cargado exitosamente para {nombre}'}), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Error al cargar usuario: {str(e)}'}), 500
 
 @app.route('/registrar_impresion', methods=['POST'])
 def registrar_impresion():
@@ -85,10 +91,15 @@ def registrar_impresion():
             cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
             conn.commit()
 
-            return jsonify({'mensaje': 'Impresión registrada', 'nuevo_saldo': nuevo_saldo}), 200
+            return jsonify({
+                'mensaje': 'Impresión registrada',
+                'nuevo_saldo': nuevo_saldo
+            }), 200
 
+    except ValueError:
+        return jsonify({'error': 'El valor de páginas debe ser un número entero'}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': f'Error al registrar impresión: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
