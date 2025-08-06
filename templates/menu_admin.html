@@ -12,18 +12,55 @@
     <form>
       <div class="mb-3">
         <label for="nombre" class="form-label">Nombre del Usuario</label>
-        <input type="text" class="form-control" id="nombre" placeholder="Ej: Juan Pérez">
+        <input type="text" class="form-control" id="nombre" placeholder="Ej: Juan Pérez" required>
       </div>
       <div class="mb-3">
         <label for="rut" class="form-label">RUT</label>
-        <input type="text" class="form-control" id="rut" placeholder="Ej: 12345678-9">
+        <input type="text" class="form-control" id="rut" placeholder="Ej: 12345678-9" required>
       </div>
       <div class="mb-3">
         <label for="monto" class="form-label">Monto Cargado ($)</label>
-        <input type="number" class="form-control" id="monto" placeholder="Ej: 5000">
+        <input type="number" class="form-control" id="monto" placeholder="Ej: 5000" required min="0">
       </div>
       <button type="submit" class="btn btn-primary">Guardar Carga</button>
     </form>
   </div>
+
+  <script>
+    document.querySelector('form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const nombre = document.getElementById('nombre').value.trim();
+      const rut = document.getElementById('rut').value.trim();
+      const monto = parseInt(document.getElementById('monto').value);
+
+      if (!nombre || !rut || isNaN(monto) || monto <= 0) {
+        alert('Por favor, completa todos los campos correctamente.');
+        return;
+      }
+
+      const paginas = Math.floor(monto / 25); // Cada página vale $25
+
+      try {
+        const respuesta = await fetch('https://prepago-backend.onrender.com/cargar_usuario', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ nombre, rut, paginas })
+        });
+
+        const data = await respuesta.json();
+
+        if (respuesta.ok) {
+          alert(data.mensaje);
+          // Opcional: limpiar formulario
+          e.target.reset();
+        } else {
+          alert(data.error || 'Error al cargar el saldo');
+        }
+      } catch (error) {
+        alert('Error en la conexión al servidor');
+      }
+    });
+  </script>
 </body>
 </html>
