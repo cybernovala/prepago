@@ -18,6 +18,7 @@ init_db()
 def index():
     return render_template('index.html')
 
+# Consulta por POST desde JS
 @app.route('/consultar', methods=['POST'])
 def consultar():
     data = request.get_json()
@@ -37,5 +38,30 @@ def consultar():
     else:
         return jsonify({'error': 'RUT no encontrado'}), 404
 
+# ✅ NUEVA CONSULTA POR GET CON PARÁMETRO EN LA URL
+@app.route('/consulta', methods=['GET'])
+def consulta():
+    rut = request.args.get('rut')
+
+    if not rut:
+        return jsonify({'error': 'RUT no proporcionado'}), 400
+
+    with sqlite3.connect("usuarios.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre, saldo FROM usuarios WHERE rut = ?", (rut,))
+        resultado = cursor.fetchone()
+
+    if resultado:
+        nombre, saldo = resultado
+        return jsonify({
+            'nombre': nombre,
+            'rut': rut,
+            'paginas_restantes': saldo
+        })
+    else:
+        return jsonify({'error': 'RUT no encontrado'}), 404
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
+
+
