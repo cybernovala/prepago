@@ -3,7 +3,7 @@ from flask_cors import CORS
 import sqlite3
 
 app = Flask(__name__)
-# Habilitar CORS para todas las rutas y orígenes
+# Permite CORS para cualquier origen en todas las rutas
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Inicializar base de datos SQLite
@@ -20,55 +20,23 @@ def init_db():
 
 init_db()
 
-@app.route('/usuarios', methods=['GET'])
-def obtener_usuarios():
-    try:
-        with sqlite3.connect("usuarios.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT nombre, rut, saldo FROM usuarios")
-            usuarios = cursor.fetchall()
-
-        resultado = [
-            {"nombre": nombre, "rut": rut, "saldo": saldo}
-            for nombre, rut, saldo in usuarios
-        ]
-        return jsonify(resultado), 200
-    except Exception as e:
-        return jsonify({'error': f'Error al obtener usuarios: {str(e)}'}), 500
-
-@app.route('/cargar_usuario', methods=['POST'])
-def cargar_usuario():
+@app.route('/consultar', methods=['POST'])
+def consultar():
     data = request.get_json()
-    nombre = data.get('nombre')
     rut = data.get('rut')
-    paginas = data.get('paginas')
+    if not rut:
+        return jsonify({'error': 'RUT no proporcionado'}), 400
 
-    if not all([nombre, rut, paginas]):
-        return jsonify({'error': 'Faltan datos'}), 400
+    with sqlite3.connect("usuarios.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre, saldo FROM usuarios WHERE rut = ?", (rut,))
+        resultado = cursor.fetchone()
 
-    try:
-        paginas = int(paginas)
-    except ValueError:
-        return jsonify({'error': 'El valor de páginas debe ser un número entero'}), 400
-
-    try:
-        with sqlite3.connect("usuarios.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
-            res = cursor.fetchone()
-
-            if res:
-                nuevo_saldo = res[0] + paginas
-                cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
-            else:
-                cursor.execute(
-                    "INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)",
-                    (nombre, rut, paginas)
-                )
-            conn.commit()
-        return jsonify({'mensaje': f'Saldo cargado exitosamente para {nombre}'}), 200
-    except Exception as e:
-        return jsonify({'error': f'Error al cargar usuario: {str(e)}'}), 500
+    if resultado:
+        nombre, saldo = resultado
+        return jsonify({'nombre': nombre, 'saldo': saldo}), 200
+    else:
+        return jsonify({'error': 'RUT no encontrado'}), 404
 
 @app.route('/registrar_impresion', methods=['POST'])
 def registrar_impresion():
@@ -84,31 +52,26 @@ def registrar_impresion():
     except ValueError:
         return jsonify({'error': 'El valor de páginas debe ser un número entero'}), 400
 
-    try:
-        with sqlite3.connect("usuarios.db") as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
-            resultado = cursor.fetchone()
+    with sqlite3.connect("usuarios.db") as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
+        resultado = cursor.fetchone()
 
-            if not resultado:
-                return jsonify({'error': 'Usuario no encontrado'}), 404
+        if not resultado:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
 
-            saldo_actual = resultado[0]
-            if paginas > saldo_actual:
-                return jsonify({'error': 'Saldo insuficiente'}), 400
+        saldo_actual = resultado[0]
+        if paginas > saldo_actual:
+            return jsonify({'error': 'Saldo insuficiente'}), 400
 
-            nuevo_saldo = saldo_actual - paginas
-            cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
-            conn.commit()
+        nuevo_saldo = saldo_actual - paginas
+        cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
+        conn.commit()
 
-            return jsonify({
-                'mensaje': 'Impresión registrada',
-                'nuevo_saldo': nuevo_saldo
-            }), 200
-
-    except Exception as e:
-        return jsonify({'error': f'Error al registrar impresión: {str(e)}'}), 500
-
+    return jsonify({
+        'mensaje': 'Impresión registrada',
+        'nuevo_saldo': nuevo_saldo
+    }), 200
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
