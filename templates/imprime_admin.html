@@ -2,124 +2,105 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Impresión Prepago - Usuario</title>
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Panel Admin - Impresión</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: center;
+    }
+    th {
+      background-color: #f2f2f2;
+    }
+    input[type="number"] {
+      width: 60px;
+    }
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+  </style>
 </head>
-<body class="bg-light">
-  <div class="container mt-5">
-    <h2 class="mb-4 text-center">Control de Impresión Prepago</h2>
-
-    <div class="mb-3">
-      <label for="rut" class="form-label">Ingrese RUT</label>
-      <input
-        type="text"
-        class="form-control"
-        id="rut"
-        placeholder="Ej: 12345678-9"
-      />
-    </div>
-    <button class="btn btn-success mb-3" onclick="consultarUsuario()">
-      Consultar
-    </button>
-
-    <div id="datosUsuario" style="display: none;">
-      <p>
-        <strong>Nombre:</strong> <span id="nombreUsuario"></span>
-      </p>
-      <p>
-        <strong>Saldo Páginas:</strong> <span id="saldoPaginas"></span>
-      </p>
-
-      <div class="mb-3">
-        <label for="paginas" class="form-label">Cantidad de Páginas a Imprimir</label>
-        <input type="number" class="form-control" id="paginas" min="1" />
-      </div>
-
-      <div class="mb-3">
-        <label for="concepto" class="form-label">Concepto</label>
-        <input
-          type="text"
-          class="form-control"
-          id="concepto"
-          placeholder="Ej: Impresión de informe"
-        />
-      </div>
-
-      <button class="btn btn-primary" onclick="confirmarImpresion()">
-        OK
-      </button>
-    </div>
-
-    <div id="mensaje" class="mt-4"></div>
-  </div>
+<body>
+  <h1>Panel de Administración - Impresiones</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>RUT</th>
+        <th>Páginas Restantes</th>
+        <th>Páginas Impresas</th>
+        <th>Actualizar</th>
+      </tr>
+    </thead>
+    <tbody id="usuarios-tbody"></tbody>
+  </table>
 
   <script>
-    // Cambia aquí por la URL donde está tu backend desplegado
-    const backendUrl = "https://prepago.onrender.com";
+    const backendURL = "https://prepago.onrender.com";
 
-    async function consultarUsuario() {
-      const rut = document.getElementById("rut").value.trim();
-      if (!rut) {
-        mostrarMensaje("Por favor, ingresa un RUT válido.", "danger");
+    async function obtenerUsuarios() {
+      const res = await fetch(`${backendURL}/usuarios`);
+      const usuarios = await res.json();
+
+      const tbody = document.getElementById("usuarios-tbody");
+      tbody.innerHTML = "";
+
+      usuarios.forEach(usuario => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td>${usuario.nombre}</td>
+          <td>${usuario.rut}</td>
+          <td id="saldo-${usuario.rut}">${usuario.paginas_restantes}</td>
+          <td><input type="number" id="impresas-${usuario.rut}" min="1" placeholder="0" /></td>
+          <td><button onclick="actualizarPaginas('${usuario.rut}')">Actualizar</button></td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function actualizarPaginas(rut) {
+      const input = document.getElementById(`impresas-${rut}`);
+      const cantidad = parseInt(input.value);
+
+      if (isNaN(cantidad) || cantidad <= 0) {
+        alert("Ingresa una cantidad válida de páginas.");
         return;
       }
 
-      try {
-        const respuesta = await fetch(`${backendUrl}/consultar`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rut }),
-        });
+      const res = await fetch(`${backendURL}/actualizar_paginas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rut: rut, paginas_impresas: cantidad })
+      });
 
-        const datos = await respuesta.json();
-        const mensaje = document.getElementById("mensaje");
-        mensaje.innerHTML = "";
+      const resultado = await res.json();
 
-        if (respuesta.ok) {
-          document.getElementById("nombreUsuario").textContent = datos.nombre;
-          document.getElementById("saldoPaginas").textContent = datos.saldo;
-          document.getElementById("datosUsuario").style.display = "block";
-        } else {
-          document.getElementById("datosUsuario").style.display = "none";
-          mostrarMensaje(datos.error, "danger");
-        }
-      } catch (error) {
-        mostrarMensaje("Error al conectar con el servidor.", "danger");
+      if (resultado.estado === "ok") {
+        const nuevoSaldo = resultado.paginas_restantes;
+        document.getElementById(`saldo-${rut}`).innerText = nuevoSaldo;
+        input.value = "";
+      } else {
+        alert(resultado.mensaje || "Error al actualizar.");
       }
     }
 
-    function confirmarImpresion() {
-      const paginas = parseInt(document.getElementById("paginas").value);
-      const saldo = parseInt(document.getElementById("saldoPaginas").textContent);
-
-      if (isNaN(paginas) || paginas < 1) {
-        mostrarMensaje("Ingrese una cantidad válida de páginas.", "danger");
-        return;
-      }
-
-      if (paginas > saldo) {
-        mostrarMensaje("Saldo insuficiente.", "danger");
-        return;
-      }
-
-      const nuevoSaldo = saldo - paginas;
-      document.getElementById("saldoPaginas").textContent = nuevoSaldo;
-      mostrarMensaje(
-        `Impresión confirmada. Nuevo saldo: ${nuevoSaldo} páginas.`,
-        "success"
-      );
-
-      // Aquí podrías agregar código para enviar la actualización al backend
-    }
-
-    function mostrarMensaje(texto, tipo) {
-      const mensaje = document.getElementById("mensaje");
-      mensaje.innerHTML = `<div class="alert alert-${tipo}">${texto}</div>`;
-    }
+    obtenerUsuarios();
   </script>
 </body>
 </html>
