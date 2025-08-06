@@ -71,21 +71,25 @@
         return;
       }
 
-      const res = await fetch(`${backendURL}/consultar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut })
-      });
+      try {
+        const res = await fetch(`${backendURL}/consultar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rut })
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (!res.ok) {
-        alert(data.error || "Usuario no encontrado");
-        document.getElementById("tabla-usuario").style.display = "none";
-        return;
+        if (!res.ok) {
+          alert(data.error || "Usuario no encontrado");
+          document.getElementById("tabla-usuario").style.display = "none";
+          return;
+        }
+
+        mostrarUsuario(data.nombre, rut, data.saldo);
+      } catch (error) {
+        alert("Error de conexión con el servidor.");
       }
-
-      mostrarUsuario(data.nombre, rut, data.saldo);
     }
 
     function mostrarUsuario(nombre, rut, saldo) {
@@ -113,19 +117,23 @@
         return;
       }
 
-      const res = await fetch(`${backendURL}/registrar_impresion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut: rut, paginas: cantidad })
-      });
+      try {
+        const res = await fetch(`${backendURL}/registrar_impresion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rut: rut, paginas: cantidad })
+        });
 
-      const resultado = await res.json();
+        const resultado = await res.json();
 
-      if (res.ok) {
-        document.getElementById(`saldo-${rut}`).innerText = resultado.nuevo_saldo;
-        input.value = "";
-      } else {
-        alert(resultado.error || "Error al actualizar.");
+        if (res.ok) {
+          document.getElementById(`saldo-${rut}`).innerText = resultado.nuevo_saldo;
+          input.value = "";
+        } else {
+          alert(resultado.error || "Error al actualizar.");
+        }
+      } catch (error) {
+        alert("Error de conexión con el servidor.");
       }
     }
   </script>
