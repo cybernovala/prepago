@@ -42,7 +42,7 @@
       const paginas = Math.floor(monto / 25); // Cada página vale $25
 
       try {
-        const respuesta = await fetch('https://prepago-backend.onrender.com/cargar_usuario', {
+        const respuesta = await fetch('https://prepago.onrender.com/cargar_usuario', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nombre, rut, paginas })
@@ -64,3 +64,4 @@
   </script>
 </body>
 </html>
+
