@@ -12,6 +12,18 @@
     h1 {
       text-align: center;
     }
+    .formulario {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    input[type="text"], input[type="number"] {
+      padding: 6px;
+      margin: 5px;
+    }
+    button {
+      padding: 6px 12px;
+      cursor: pointer;
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -25,18 +37,17 @@
     th {
       background-color: #f2f2f2;
     }
-    input[type="number"] {
-      width: 60px;
-    }
-    button {
-      padding: 6px 12px;
-      cursor: pointer;
-    }
   </style>
 </head>
 <body>
   <h1>Panel de Administración - Impresiones</h1>
-  <table>
+
+  <div class="formulario">
+    <input type="text" id="rut-input" placeholder="Ingrese RUT" />
+    <button onclick="buscarUsuario()">Buscar</button>
+  </div>
+
+  <table id="tabla-usuario" style="display: none;">
     <thead>
       <tr>
         <th>Nombre</th>
@@ -46,32 +57,51 @@
         <th>Actualizar</th>
       </tr>
     </thead>
-    <tbody id="usuarios-tbody"></tbody>
+    <tbody id="usuario-tbody"></tbody>
   </table>
 
   <script>
     const backendURL = "https://prepago.onrender.com";
 
-    async function obtenerUsuarios() {
-      const res = await fetch(`${backendURL}/usuarios`);
-      const usuarios = await res.json();
+    async function buscarUsuario() {
+      const rut = document.getElementById("rut-input").value.trim();
 
-      const tbody = document.getElementById("usuarios-tbody");
-      tbody.innerHTML = "";
+      if (!rut) {
+        alert("Ingrese un RUT.");
+        return;
+      }
 
-      usuarios.forEach(usuario => {
-        const tr = document.createElement("tr");
-
-        tr.innerHTML = `
-          <td>${usuario.nombre}</td>
-          <td>${usuario.rut}</td>
-          <td id="saldo-${usuario.rut}">${usuario.saldo}</td>
-          <td><input type="number" id="impresas-${usuario.rut}" min="1" placeholder="0" /></td>
-          <td><button onclick="actualizarPaginas('${usuario.rut}')">Actualizar</button></td>
-        `;
-
-        tbody.appendChild(tr);
+      const res = await fetch(`${backendURL}/consultar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rut })
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.error || "Usuario no encontrado");
+        document.getElementById("tabla-usuario").style.display = "none";
+        return;
+      }
+
+      mostrarUsuario(data.nombre, rut, data.saldo);
+    }
+
+    function mostrarUsuario(nombre, rut, saldo) {
+      const tbody = document.getElementById("usuario-tbody");
+      const tabla = document.getElementById("tabla-usuario");
+      tabla.style.display = "table";
+
+      tbody.innerHTML = `
+        <tr>
+          <td>${nombre}</td>
+          <td>${rut}</td>
+          <td id="saldo-${rut}">${saldo}</td>
+          <td><input type="number" id="impresas-${rut}" min="1" placeholder="0" /></td>
+          <td><button onclick="actualizarPaginas('${rut}')">Actualizar</button></td>
+        </tr>
+      `;
     }
 
     async function actualizarPaginas(rut) {
@@ -98,8 +128,6 @@
         alert(resultado.error || "Error al actualizar.");
       }
     }
-
-    obtenerUsuarios();
   </script>
 </body>
 </html>
