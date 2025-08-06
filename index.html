@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Consulta de Impresiones</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      background: #f8f8f8;
+      text-align: center;
+    }
+    input, button {
+      padding: 10px;
+      margin-top: 10px;
+      width: 80%;
+      font-size: 16px;
+    }
+    #resultado {
+      margin-top: 20px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h2>Consulta tu saldo de impresiones</h2>
+  <input type="text" id="rut" placeholder="Ingresa tu RUT (ej: 12345678-9)">
+  <button onclick="consultarSaldo()">Consultar</button>
+
+  <p id="resultado"></p>
+
+  <script>
+    async function consultarSaldo() {
+      const rut = document.getElementById("rut").value;
+      const res = await fetch(`https://prepago-backend.onrender.com/saldo/${rut}`);
+      const data = await res.json();
+      if (data.paginas !== undefined) {
+        document.getElementById("resultado").textContent =
+          `Hola ${data.nombre}, tienes ${data.paginas} páginas disponibles.`;
+      } else {
+        document.getElementById("resultado").textContent = "Usuario no encontrado.";
+      }
+    }
+  </script>
+</body>
+</html>
