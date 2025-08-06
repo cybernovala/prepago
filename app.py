@@ -3,10 +3,17 @@ from flask_cors import CORS
 import sqlite3
 
 app = Flask(__name__)
-# Permite CORS para cualquier origen en todas las rutas
-CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Inicializar base de datos SQLite
+# Configuración CORS explícita
+CORS(app, supports_credentials=True, resources={
+    r"/*": {
+        "origins": "*",  # O usa "https://cybernovala.github.io" si quieres restringirlo
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
+
+# Inicializar base de datos
 def init_db():
     with sqlite3.connect("usuarios.db") as conn:
         conn.execute('''
@@ -20,8 +27,11 @@ def init_db():
 
 init_db()
 
-@app.route('/consultar', methods=['POST'])
+@app.route('/consultar', methods=['POST', 'OPTIONS'])
 def consultar():
+    if request.method == 'OPTIONS':
+        return '', 204  # Preflight OK
+
     data = request.get_json()
     rut = data.get('rut')
     if not rut:
@@ -38,8 +48,11 @@ def consultar():
     else:
         return jsonify({'error': 'RUT no encontrado'}), 404
 
-@app.route('/registrar_impresion', methods=['POST'])
+@app.route('/registrar_impresion', methods=['POST', 'OPTIONS'])
 def registrar_impresion():
+    if request.method == 'OPTIONS':
+        return '', 204
+
     data = request.get_json()
     rut = data.get('rut')
     paginas = data.get('paginas')
@@ -72,6 +85,39 @@ def registrar_impresion():
         'mensaje': 'Impresión registrada',
         'nuevo_saldo': nuevo_saldo
     }), 200
+
+@app.route('/cargar_usuario', methods=['POST', 'OPTIONS'])
+def cargar_usuario():
+    if request.method == 'OPTIONS':
+        return '', 204
+
+    data = request.get_json()
+    nombre = data.get('nombre')
+    rut = data.get('rut')
+    paginas = data.get('paginas')
+
+    if not all([nombre, rut, paginas]):
+        return jsonify({'error': 'Faltan datos'}), 400
+
+    try:
+        paginas = int(paginas)
+        with sqlite3.connect("usuarios.db") as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
+            res = cursor.fetchone()
+
+            if res:
+                nuevo_saldo = res[0] + paginas
+                cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
+            else:
+                cursor.execute(
+                    "INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)",
+                    (nombre, rut, paginas)
+                )
+            conn.commit()
+        return jsonify({'mensaje': f'Saldo cargado exitosamente para {nombre}'}), 200
+    except Exception as e:
+        return jsonify({'error': f'Error al cargar usuario: {str(e)}'}), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
