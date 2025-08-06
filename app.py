@@ -3,9 +3,10 @@ from flask_cors import CORS
 import sqlite3
 
 app = Flask(__name__)
-CORS(app)
+# Habilitar CORS para todas las rutas y orígenes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Inicializar base de datos
+# Inicializar base de datos SQLite
 def init_db():
     with sqlite3.connect("usuarios.db") as conn:
         conn.execute('''
@@ -16,6 +17,7 @@ def init_db():
                 saldo INTEGER DEFAULT 200
             )
         ''')
+
 init_db()
 
 @app.route('/usuarios', methods=['GET'])
@@ -30,7 +32,7 @@ def obtener_usuarios():
             {"nombre": nombre, "rut": rut, "saldo": saldo}
             for nombre, rut, saldo in usuarios
         ]
-        return jsonify(resultado)
+        return jsonify(resultado), 200
     except Exception as e:
         return jsonify({'error': f'Error al obtener usuarios: {str(e)}'}), 500
 
@@ -46,6 +48,10 @@ def cargar_usuario():
 
     try:
         paginas = int(paginas)
+    except ValueError:
+        return jsonify({'error': 'El valor de páginas debe ser un número entero'}), 400
+
+    try:
         with sqlite3.connect("usuarios.db") as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
@@ -75,6 +81,10 @@ def registrar_impresion():
 
     try:
         paginas = int(paginas)
+    except ValueError:
+        return jsonify({'error': 'El valor de páginas debe ser un número entero'}), 400
+
+    try:
         with sqlite3.connect("usuarios.db") as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT saldo FROM usuarios WHERE rut = ?", (rut,))
@@ -96,10 +106,9 @@ def registrar_impresion():
                 'nuevo_saldo': nuevo_saldo
             }), 200
 
-    except ValueError:
-        return jsonify({'error': 'El valor de páginas debe ser un número entero'}), 400
     except Exception as e:
         return jsonify({'error': f'Error al registrar impresión: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
