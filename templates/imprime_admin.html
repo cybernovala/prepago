@@ -65,7 +65,7 @@
         tr.innerHTML = `
           <td>${usuario.nombre}</td>
           <td>${usuario.rut}</td>
-          <td id="saldo-${usuario.rut}">${usuario.paginas_restantes}</td>
+          <td id="saldo-${usuario.rut}">${usuario.saldo}</td>
           <td><input type="number" id="impresas-${usuario.rut}" min="1" placeholder="0" /></td>
           <td><button onclick="actualizarPaginas('${usuario.rut}')">Actualizar</button></td>
         `;
@@ -83,20 +83,19 @@
         return;
       }
 
-      const res = await fetch(`${backendURL}/actualizar_paginas`, {
+      const res = await fetch(`${backendURL}/registrar_impresion`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut: rut, paginas_impresas: cantidad })
+        body: JSON.stringify({ rut: rut, paginas: cantidad })
       });
 
       const resultado = await res.json();
 
-      if (resultado.estado === "ok") {
-        const nuevoSaldo = resultado.paginas_restantes;
-        document.getElementById(`saldo-${rut}`).innerText = nuevoSaldo;
+      if (res.ok) {
+        document.getElementById(`saldo-${rut}`).innerText = resultado.nuevo_saldo;
         input.value = "";
       } else {
-        alert(resultado.mensaje || "Error al actualizar.");
+        alert(resultado.error || "Error al actualizar.");
       }
     }
 
