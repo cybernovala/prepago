@@ -3,7 +3,6 @@ import sqlite3
 
 app = Flask(__name__)
 
-# Crear la base de datos si no existe
 def init_db():
     with sqlite3.connect("usuarios.db") as conn:
         conn.execute('''CREATE TABLE IF NOT EXISTS usuarios (
@@ -12,13 +11,28 @@ def init_db():
                             rut TEXT NOT NULL UNIQUE,
                             saldo INTEGER DEFAULT 200
                         )''')
+
+def insertar_usuarios_demo():
+    usuarios_demo = [
+        ("JUAN PÉREZ", "11111111-1", 150),
+        ("MARÍA GÓMEZ", "22222222-2", 80)
+    ]
+    with sqlite3.connect("usuarios.db") as conn:
+        cursor = conn.cursor()
+        for nombre, rut, saldo in usuarios_demo:
+            try:
+                cursor.execute("INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)", (nombre, rut, saldo))
+            except sqlite3.IntegrityError:
+                pass
+        conn.commit()
+
 init_db()
+insertar_usuarios_demo()
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Consulta por POST desde JS
 @app.route('/consultar', methods=['POST'])
 def consultar():
     data = request.get_json()
@@ -38,11 +52,9 @@ def consultar():
     else:
         return jsonify({'error': 'RUT no encontrado'}), 404
 
-# ✅ NUEVA CONSULTA POR GET CON PARÁMETRO EN LA URL
-@app.route('/consulta', methods=['GET'])
+@app.route('/consulta')
 def consulta():
     rut = request.args.get('rut')
-
     if not rut:
         return jsonify({'error': 'RUT no proporcionado'}), 400
 
@@ -53,15 +65,9 @@ def consulta():
 
     if resultado:
         nombre, saldo = resultado
-        return jsonify({
-            'nombre': nombre,
-            'rut': rut,
-            'paginas_restantes': saldo
-        })
+        return jsonify({'nombre': nombre, 'rut': rut, 'paginas_restantes': saldo})
     else:
         return jsonify({'error': 'RUT no encontrado'}), 404
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
-
-
