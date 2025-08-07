@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Consulta de Usuarios</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 2rem;
+      background-color: #f4f4f4;
+    }
+    h2 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      background-color: white;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: center;
+    }
+    th {
+      background-color: #333;
+      color: white;
+    }
+    tr:hover {
+      background-color: #f1f1f1;
+    }
+  </style>
+</head>
+<body>
+  <h2>Listado de Usuarios y Saldo de Páginas</h2>
+  <table id="tablaUsuarios">
+    <thead>
+      <tr>
+        <th>Nombre</th>
+        <th>RUT</th>
+        <th>Saldo de Páginas</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    async function cargarUsuarios() {
+      try {
+        const response = await fetch('https://prepago.onrender.com/get_usuarios');
+        const data = await response.json();
+        const tabla = document.querySelector("#tablaUsuarios tbody");
+
+        if (data.usuarios && data.usuarios.length > 0) {
+          tabla.innerHTML = '';
+          data.usuarios.forEach(user => {
+            const fila = `
+              <tr>
+                <td>${user.nombre}</td>
+                <td>${user.rut}</td>
+                <td>${user.saldo}</td>
+              </tr>
+            `;
+            tabla.innerHTML += fila;
+          });
+        } else {
+          tabla.innerHTML = '<tr><td colspan="3">No hay usuarios registrados.</td></tr>';
+        }
+
+      } catch (error) {
+        console.error('Error al cargar usuarios:', error);
+        document.querySelector("#tablaUsuarios tbody").innerHTML = '<tr><td colspan="3">Error al conectar con el servidor</td></tr>';
+      }
+    }
+
+    cargarUsuarios();
+  </script>
+</body>
+</html>
