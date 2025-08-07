@@ -1,61 +1,61 @@
+<!-- index del usuario -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Consulta de Saldo</title>
+</head>
+<body>
+  <input id="rutInput" placeholder="Ingresa tu RUT">
+  <button onclick="consultarRut()">Consultar</button>
+  <div id="error" style="color:red;display:none;"></div>
+  <div id="resultado" style="display:none;">
+    <p>Nombre: <span id="nombre"></span></p>
+    <p>Saldo: <span id="saldo"></span></p>
+    <button id="btnWhatsapp">Solicitar Impresión por WhatsApp</button>
+  </div>
 
-<script>
-  let rutGlobal = '';
+  <script>
+    let rutGlobal = '';
+    window.addEventListener('DOMContentLoaded', () => {
+      const rut = localStorage.getItem('rut');
+      if (rut) document.getElementById('rutInput').value = rut;
+    });
 
-  window.addEventListener('DOMContentLoaded', () => {
-    const rutGuardado = localStorage.getItem('rut');
-    if (rutGuardado) {
-      document.getElementById('rutInput').value = rutGuardado;
-    }
-  });
+    async function consultarRut() {
+      const rut = document.getElementById('rutInput').value.trim();
+      const resultadoDiv = document.getElementById('resultado');
+      const errorDiv = document.getElementById('error');
+      resultadoDiv.style.display = 'none';
+      errorDiv.style.display = 'none';
+      if (!rut) return errorDiv.textContent = "Ingresa un RUT", errorDiv.style.display = 'block';
 
-  async function consultarRut() {
-    const rut = document.getElementById('rutInput').value.trim();
-    const resultadoDiv = document.getElementById('resultado');
-    const errorDiv = document.getElementById('error');
-
-    resultadoDiv.style.display = 'none';
-    errorDiv.style.display = 'none';
-
-    if (!rut) {
-      errorDiv.textContent = 'Por favor ingresa un RUT.';
-      errorDiv.style.display = 'block';
-      return;
-    }
-
-    try {
-      const response = await fetch('https://prepago.onrender.com/consultar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rut })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        rutGlobal = rut;
-        localStorage.setItem('rut', rut);
-
-        document.getElementById('nombre').textContent = data.nombre;
-        document.getElementById('saldo').textContent = data.saldo;
-        resultadoDiv.style.display = 'block';
-
-        document.getElementById('btnWhatsapp').onclick = () => {
-          const mensaje = `Hola, soy ${data.nombre} (RUT: ${rutGlobal}). Quiero solicitar una impresión desde la app.`;
-          const telefonoAdmin = '56966648585';
-          const url = `https://wa.me/${telefonoAdmin}?text=${encodeURIComponent(mensaje)}`;
-          window.open(url, '_blank');
-        };
-
-      } else {
-        errorDiv.textContent = data.error || 'Error al consultar el RUT.';
+      try {
+        const res = await fetch('https://prepago.onrender.com/consultar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ rut })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          rutGlobal = rut;
+          localStorage.setItem('rut', rut);
+          document.getElementById('nombre').textContent = data.nombre;
+          document.getElementById('saldo').textContent = data.saldo;
+          document.getElementById('btnWhatsapp').onclick = () => {
+            const mensaje = `Hola, soy ${data.nombre} (RUT: ${rutGlobal}). Solicito una impresión.`;
+            window.open(`https://wa.me/56966648585?text=${encodeURIComponent(mensaje)}`, '_blank');
+          };
+          resultadoDiv.style.display = 'block';
+        } else {
+          errorDiv.textContent = data.error || "Error al consultar";
+          errorDiv.style.display = 'block';
+        }
+      } catch {
+        errorDiv.textContent = "No se pudo conectar al servidor.";
         errorDiv.style.display = 'block';
       }
-
-    } catch (error) {
-      errorDiv.textContent = 'No se pudo conectar al servidor.';
-      errorDiv.style.display = 'block';
     }
-  }
-</script>
-
+  </script>
+</body>
+</html>
