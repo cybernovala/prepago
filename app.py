@@ -111,15 +111,17 @@ def handle_requests():
                            (rut, 'recarga', paginas, datetime.now().isoformat()))
             conn.commit()
         return cors_response({'mensaje': f'Saldo cargado exitosamente para {nombre}'})
-@app.route('/todos_usuarios', methods=['GET'])
-def todos_usuarios():
+@app.route('/get_usuarios', methods=['GET'])
+def get_usuarios():
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT nombre, rut, saldo FROM usuarios ORDER BY nombre ASC")
-        usuarios = cursor.fetchall()
-        data = [{'nombre': n, 'rut': r, 'saldo': s} for n, r, s in usuarios]
-    return cors_response({'usuarios': data})
+        cursor.execute("SELECT nombre, rut, saldo FROM usuarios")
+        rows = cursor.fetchall()
+        usuarios = [{'nombre': r[0], 'rut': r[1], 'saldo': r[2]} for r in rows]
+    return cors_response({'usuarios': usuarios})
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
+
 
