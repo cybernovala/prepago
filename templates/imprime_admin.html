@@ -5,46 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Panel Admin - Impresión</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background-color: #f5f5f5;
-    }
-    h1 {
-      text-align: center;
-      color: #333;
-    }
-    .formulario {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    input[type="text"], input[type="number"] {
-      padding: 8px;
-      margin: 5px;
-      width: 200px;
-    }
-    button {
-      padding: 8px 16px;
-      cursor: pointer;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-      background-color: white;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 10px;
-      text-align: center;
-    }
-    th {
-      background-color: #eee;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
+    h1 { text-align: center; color: #333; }
+    .formulario { text-align: center; margin-bottom: 20px; }
+    input[type="text"], input[type="number"] { padding: 8px; margin: 5px; width: 200px; }
+    button { padding: 8px 16px; cursor: pointer; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+    th { background-color: #eee; }
   </style>
 </head>
 <body>
-
   <h1>Panel de Administración - Impresiones</h1>
 
   <div class="formulario">
@@ -72,11 +43,7 @@
       const rut = document.getElementById("rut-input").value.trim();
       const tabla = document.getElementById("tabla-usuario");
       const tbody = document.getElementById("usuario-tbody");
-
-      if (!rut) {
-        alert("Por favor ingrese un RUT.");
-        return;
-      }
+      if (!rut) { alert("Por favor ingrese un RUT."); return; }
 
       try {
         const res = await fetch(`${backendURL}/consultar`, {
@@ -84,7 +51,6 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rut })
         });
-
         const data = await res.json();
 
         if (!res.ok) {
@@ -94,42 +60,27 @@
           return;
         }
 
-        mostrarUsuario(data.nombre, rut, data.saldo);
-      } catch (error) {
+        tbody.innerHTML = `
+          <tr>
+            <td>${data.nombre}</td>
+            <td>${rut}</td>
+            <td id="saldo-${rut}">${data.saldo}</td>
+            <td><input type="number" id="impresas-${rut}" min="1" placeholder="0" style="width: 80px;" /></td>
+            <td><button id="btn-${rut}" onclick="actualizarPaginas('${rut}')">Actualizar</button></td>
+          </tr>`;
+        tabla.style.display = "table";
+      } catch {
         alert("Error al conectar con el servidor.");
         tabla.style.display = "none";
         tbody.innerHTML = "";
       }
     }
 
-    function mostrarUsuario(nombre, rut, saldo) {
-      const tabla = document.getElementById("tabla-usuario");
-      const tbody = document.getElementById("usuario-tbody");
-
-      tbody.innerHTML = `
-        <tr>
-          <td>${nombre}</td>
-          <td>${rut}</td>
-          <td id="saldo-${rut}">${saldo}</td>
-          <td><input type="number" id="impresas-${rut}" min="1" placeholder="0" style="width: 80px;" /></td>
-          <td>
-            <button id="btn-${rut}" onclick="actualizarPaginas('${rut}')">Actualizar</button>
-          </td>
-        </tr>
-      `;
-
-      tabla.style.display = "table";
-    }
-
     async function actualizarPaginas(rut) {
       const input = document.getElementById(`impresas-${rut}`);
       const boton = document.getElementById(`btn-${rut}`);
       const cantidad = parseInt(input.value);
-
-      if (isNaN(cantidad) || cantidad <= 0) {
-        alert("Ingresa una cantidad válida de páginas.");
-        return;
-      }
+      if (isNaN(cantidad) || cantidad <= 0) { alert("Ingresa una cantidad válida de páginas."); return; }
 
       boton.disabled = true;
       boton.textContent = "Procesando...";
@@ -140,7 +91,6 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ rut, paginas: cantidad })
         });
-
         const data = await res.json();
 
         if (res.ok) {
@@ -149,7 +99,7 @@
         } else {
           alert(data.error || "No se pudo actualizar.");
         }
-      } catch (error) {
+      } catch {
         alert("Error al conectar con el servidor.");
       } finally {
         boton.disabled = false;
