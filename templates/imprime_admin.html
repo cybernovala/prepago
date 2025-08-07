@@ -1,111 +1,94 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Panel Admin - Impresión</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }
-    h1 { text-align: center; color: #333; }
-    .formulario { text-align: center; margin-bottom: 20px; }
-    input[type="text"], input[type="number"] { padding: 8px; margin: 5px; width: 200px; }
-    button { padding: 8px 16px; cursor: pointer; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white; }
-    th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
-    th { background-color: #eee; }
-  </style>
-</head>
-<body>
-  <h1>Panel de Administración - Impresiones</h1>
+...
+<script>
+  const backendURL = "https://prepago.onrender.com";
 
-  <div class="formulario">
-    <input type="text" id="rut-input" placeholder="Ingrese RUT" />
-    <button onclick="buscarUsuario()">Buscar</button>
-  </div>
+  async function buscarUsuario() {
+    const rut = document.getElementById("rut-input").value.trim();
+    const tabla = document.getElementById("tabla-usuario");
+    const tbody = document.getElementById("usuario-tbody");
 
-  <table id="tabla-usuario" style="display: none;">
-    <thead>
-      <tr>
-        <th>Nombre</th>
-        <th>RUT</th>
-        <th>Páginas Restantes</th>
-        <th>Páginas Impresas</th>
-        <th>Actualizar</th>
-      </tr>
-    </thead>
-    <tbody id="usuario-tbody"></tbody>
-  </table>
+    if (!rut) {
+      alert("Por favor ingrese un RUT.");
+      return;
+    }
 
-  <script>
-    const backendURL = "https://prepago.onrender.com";
+    try {
+      const res = await fetch(`${backendURL}/consultar`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rut })
+      });
 
-    async function buscarUsuario() {
-      const rut = document.getElementById("rut-input").value.trim();
-      const tabla = document.getElementById("tabla-usuario");
-      const tbody = document.getElementById("usuario-tbody");
-      if (!rut) { alert("Por favor ingrese un RUT."); return; }
+      const data = await res.json();
 
-      try {
-        const res = await fetch(`${backendURL}/consultar`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rut })
-        });
-        const data = await res.json();
-
-        if (!res.ok) {
-          alert(data.error || "Usuario no encontrado.");
-          tabla.style.display = "none";
-          tbody.innerHTML = "";
-          return;
-        }
-
-        tbody.innerHTML = `
-          <tr>
-            <td>${data.nombre}</td>
-            <td>${rut}</td>
-            <td id="saldo-${rut}">${data.saldo}</td>
-            <td><input type="number" id="impresas-${rut}" min="1" placeholder="0" style="width: 80px;" /></td>
-            <td><button id="btn-${rut}" onclick="actualizarPaginas('${rut}')">Actualizar</button></td>
-          </tr>`;
-        tabla.style.display = "table";
-      } catch {
-        alert("Error al conectar con el servidor.");
+      if (!res.ok) {
+        alert(data.error || "Usuario no encontrado.");
         tabla.style.display = "none";
         tbody.innerHTML = "";
+        return;
       }
+
+      mostrarUsuario(data.nombre, rut, data.saldo);
+    } catch (error) {
+      alert("Error al conectar con el servidor.");
+      tabla.style.display = "none";
+      tbody.innerHTML = "";
+    }
+  }
+
+  function mostrarUsuario(nombre, rut, saldo) {
+    const tabla = document.getElementById("tabla-usuario");
+    const tbody = document.getElementById("usuario-tbody");
+
+    tbody.innerHTML = `
+      <tr>
+        <td>${nombre}</td>
+        <td>${rut}</td>
+        <td id="saldo-${rut}">${saldo}</td>
+        <td><input type="number" id="impresas-${rut}" min="1" placeholder="0" style="width: 80px;" /></td>
+        <td>
+          <button id="btn-${rut}" onclick="actualizarPaginas('${rut}')">Actualizar</button>
+        </td>
+      </tr>
+    `;
+
+    tabla.style.display = "table";
+  }
+
+  async function actualizarPaginas(rut) {
+    const input = document.getElementById(`impresas-${rut}`);
+    const boton = document.getElementById(`btn-${rut}`);
+    const cantidad = parseInt(input.value);
+
+    if (isNaN(cantidad) || cantidad <= 0) {
+      alert("Ingresa una cantidad válida de páginas.");
+      return;
     }
 
-    async function actualizarPaginas(rut) {
-      const input = document.getElementById(`impresas-${rut}`);
-      const boton = document.getElementById(`btn-${rut}`);
-      const cantidad = parseInt(input.value);
-      if (isNaN(cantidad) || cantidad <= 0) { alert("Ingresa una cantidad válida de páginas."); return; }
+    boton.disabled = true;
+    boton.textContent = "Procesando...";
 
-      boton.disabled = true;
-      boton.textContent = "Procesando...";
+    try {
+      const res = await fetch(`${backendURL}/registrar_impresion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rut, paginas: cantidad })
+      });
 
-      try {
-        const res = await fetch(`${backendURL}/registrar_impresion`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ rut, paginas: cantidad })
-        });
-        const data = await res.json();
+      const data = await res.json();
 
-        if (res.ok) {
-          document.getElementById(`saldo-${rut}`).innerText = data.nuevo_saldo;
-          input.value = "";
-        } else {
-          alert(data.error || "No se pudo actualizar.");
-        }
-      } catch {
-        alert("Error al conectar con el servidor.");
-      } finally {
-        boton.disabled = false;
-        boton.textContent = "Actualizar";
+      if (res.ok) {
+        document.getElementById(`saldo-${rut}`).innerText = data.nuevo_saldo;
+        input.value = "";
+      } else {
+        alert(data.error || "No se pudo actualizar.");
       }
+    } catch (error) {
+      alert("Error al conectar con el servidor.");
+    } finally {
+      boton.disabled = false;
+      boton.textContent = "Actualizar";
     }
-  </script>
-</body>
-</html>
+  }
+</script>
+...
