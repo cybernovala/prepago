@@ -23,7 +23,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS historial (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 rut TEXT NOT NULL,
-                tipo TEXT NOT NULL,  -- "recarga" o "impresion"
+                tipo TEXT NOT NULL,
                 cantidad INTEGER NOT NULL,
                 fecha TEXT NOT NULL
             )
@@ -41,7 +41,6 @@ def cors_response(data, status=200):
 @app.route('/consultar', methods=['POST', 'OPTIONS'])
 @app.route('/registrar_impresion', methods=['POST', 'OPTIONS'])
 @app.route('/cargar_usuario', methods=['POST', 'OPTIONS'])
-@app.route('/historial', methods=['POST', 'OPTIONS'])
 def handle_requests():
     if request.method == 'OPTIONS':
         return cors_response({}, 204)
@@ -60,9 +59,9 @@ def handle_requests():
                 return cors_response({'error': 'RUT no encontrado'}, 404)
 
             cursor.execute("SELECT tipo, cantidad, fecha FROM historial WHERE rut = ? ORDER BY fecha DESC", (rut,))
-            historial = [{'tipo': t, 'cantidad': c, 'fecha': f} for t, c, f in cursor.fetchall()]
-
-        return cors_response({'nombre': res[0], 'saldo': res[1], 'historial': historial})
+            historial = cursor.fetchall()
+            historial_data = [{'tipo': t, 'cantidad': c, 'fecha': f} for t, c, f in historial]
+        return cors_response({'nombre': res[0], 'saldo': res[1], 'historial': historial_data})
 
     elif request.path == '/registrar_impresion':
         paginas = data.get('paginas')
@@ -84,7 +83,8 @@ def handle_requests():
                 return cors_response({'error': 'Saldo insuficiente'}, 400)
             nuevo_saldo = saldo - paginas
             cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
-            cursor.execute("INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (?, 'impresion', ?, ?)", (rut, paginas, datetime.now().isoformat()))
+            cursor.execute("INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (?, ?, ?, ?)",
+                           (rut, 'impresion', paginas, datetime.now().isoformat()))
             conn.commit()
         return cors_response({'mensaje': 'Impresión registrada', 'nuevo_saldo': nuevo_saldo})
 
@@ -107,13 +107,10 @@ def handle_requests():
                 cursor.execute("UPDATE usuarios SET saldo = ? WHERE rut = ?", (nuevo_saldo, rut))
             else:
                 cursor.execute("INSERT INTO usuarios (nombre, rut, saldo) VALUES (?, ?, ?)", (nombre, rut, paginas))
-            cursor.execute("INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (?, 'recarga', ?, ?)", (rut, paginas, datetime.now().isoformat()))
+            cursor.execute("INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (?, ?, ?, ?)",
+                           (rut, 'recarga', paginas, datetime.now().isoformat()))
             conn.commit()
         return cors_response({'mensaje': f'Saldo cargado exitosamente para {nombre}'})
 
-    elif request.path == '/historial':
-        with sqlite3.connect(DB_PATH) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT tipo, cantidad, fecha FROM historial WHERE rut = ? ORDER BY fecha DESC", (rut,))
-            historial = [{'tipo': t, 'cantidad': c, 'fecha': f} for t, c, f in cursor.fetchall()]
-        return cors_response({'historial': historial})
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=10000)
