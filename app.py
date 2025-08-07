@@ -112,15 +112,5 @@ def handle_requests():
             conn.commit()
         return cors_response({'mensaje': f'Saldo cargado exitosamente para {nombre}'})
 
-# NUEVA RUTA: Obtener todos los usuarios
-@app.route('/get_usuarios', methods=['GET'])
-def get_usuarios():
-    with sqlite3.connect(DB_PATH) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT nombre, rut, saldo FROM usuarios")
-        rows = cursor.fetchall()
-        usuarios = [{'nombre': r[0], 'rut': r[1], 'saldo': r[2]} for r in rows]
-    return cors_response({'usuarios': usuarios})
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
