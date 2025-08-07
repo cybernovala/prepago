@@ -1,94 +1,70 @@
+<!-- impresión por admin -->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Impresión - Admin</title>
+</head>
+<body>
+  <input type="text" id="rut-input" placeholder="RUT del usuario">
+  <button onclick="buscarUsuario()">Buscar</button>
+  <table id="tabla-usuario" style="display:none;">
+    <thead><tr><th>Nombre</th><th>RUT</th><th>Saldo</th><th>Impresas</th><th>Acción</th></tr></thead>
+    <tbody id="usuario-tbody"></tbody>
+  </table>
 
-<script>
-  const backendURL = "https://prepago.onrender.com";
+  <script>
+    const backendURL = "https://prepago.onrender.com";
+    async function buscarUsuario() {
+      const rut = document.getElementById("rut-input").value.trim();
+      const tabla = document.getElementById("tabla-usuario");
+      const tbody = document.getElementById("usuario-tbody");
+      if (!rut) return alert("Ingrese RUT");
 
-  async function buscarUsuario() {
-    const rut = document.getElementById("rut-input").value.trim();
-    const tabla = document.getElementById("tabla-usuario");
-    const tbody = document.getElementById("usuario-tbody");
+      try {
+        const res = await fetch(`${backendURL}/consultar`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rut })
+        });
+        const data = await res.json();
+        if (!res.ok) return alert(data.error || "Error"), tabla.style.display = "none";
 
-    if (!rut) {
-      alert("Por favor ingrese un RUT.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${backendURL}/consultar`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.error || "Usuario no encontrado.");
+        tbody.innerHTML = `
+          <tr>
+            <td>${data.nombre}</td>
+            <td>${rut}</td>
+            <td id="saldo-${rut}">${data.saldo}</td>
+            <td><input type="number" id="impresas-${rut}" min="1" style="width: 80px;" /></td>
+            <td><button onclick="actualizarPaginas('${rut}')">Actualizar</button></td>
+          </tr>`;
+        tabla.style.display = "table";
+      } catch {
+        alert("Error de conexión.");
         tabla.style.display = "none";
-        tbody.innerHTML = "";
-        return;
       }
-
-      mostrarUsuario(data.nombre, rut, data.saldo);
-    } catch (error) {
-      alert("Error al conectar con el servidor.");
-      tabla.style.display = "none";
-      tbody.innerHTML = "";
-    }
-  }
-
-  function mostrarUsuario(nombre, rut, saldo) {
-    const tabla = document.getElementById("tabla-usuario");
-    const tbody = document.getElementById("usuario-tbody");
-
-    tbody.innerHTML = `
-      <tr>
-        <td>${nombre}</td>
-        <td>${rut}</td>
-        <td id="saldo-${rut}">${saldo}</td>
-        <td><input type="number" id="impresas-${rut}" min="1" placeholder="0" style="width: 80px;" /></td>
-        <td>
-          <button id="btn-${rut}" onclick="actualizarPaginas('${rut}')">Actualizar</button>
-        </td>
-      </tr>
-    `;
-
-    tabla.style.display = "table";
-  }
-
-  async function actualizarPaginas(rut) {
-    const input = document.getElementById(`impresas-${rut}`);
-    const boton = document.getElementById(`btn-${rut}`);
-    const cantidad = parseInt(input.value);
-
-    if (isNaN(cantidad) || cantidad <= 0) {
-      alert("Ingresa una cantidad válida de páginas.");
-      return;
     }
 
-    boton.disabled = true;
-    boton.textContent = "Procesando...";
+    async function actualizarPaginas(rut) {
+      const input = document.getElementById(`impresas-${rut}`);
+      const cantidad = parseInt(input.value);
+      if (isNaN(cantidad) || cantidad <= 0) return alert("Cantidad inválida");
 
-    try {
-      const res = await fetch(`${backendURL}/registrar_impresion`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rut, paginas: cantidad })
-      });
-
-      const data = await res.json();
-
-      if (res.ok) {
-        document.getElementById(`saldo-${rut}`).innerText = data.nuevo_saldo;
-        input.value = "";
-      } else {
-        alert(data.error || "No se pudo actualizar.");
+      try {
+        const res = await fetch(`${backendURL}/registrar_impresion`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rut, paginas: cantidad })
+        });
+        const data = await res.json();
+        if (res.ok) {
+          document.getElementById(`saldo-${rut}`).textContent = data.nuevo_saldo;
+          input.value = "";
+        } else alert(data.error);
+      } catch {
+        alert("Error de conexión.");
       }
-    } catch (error) {
-      alert("Error al conectar con el servidor.");
-    } finally {
-      boton.disabled = false;
-      boton.textContent = "Actualizar";
     }
-  }
-</script>
-
+  </script>
+</body>
+</html>
