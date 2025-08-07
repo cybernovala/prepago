@@ -37,7 +37,7 @@
       const rut = document.getElementById('rut').value.trim();
 
       try {
-        const response = await fetch('https://prepago-impr.onrender.com/consulta/' + encodeURIComponent(rut));
+        const response = await fetch('https://prepago.onrender.com/consulta/' + encodeURIComponent(rut));
         if (!response.ok) throw new Error('No se encontró el RUT');
 
         const data = await response.json();
@@ -53,3 +53,4 @@
 
 </body>
 </html>
+
