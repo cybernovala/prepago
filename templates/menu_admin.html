@@ -44,7 +44,7 @@
         return;
       }
 
-      const paginas = Math.floor(monto / 25); // Cada página cuesta $25
+      const paginas = Math.floor(monto / 25);
 
       try {
         const respuesta = await fetch(`${backendURL}/cargar_usuario`, {
