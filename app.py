@@ -1,149 +1,164 @@
-# app.py  (ARCHIVO COMPLETO)
-import os
-from datetime import datetime
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.exc import IntegrityError
+import psycopg2
+import os
+from datetime import datetime
 
-# ---------- CONFIG ----------
-# Usa DATABASE_URL si está definido (Neon), si no caerá a sqlite local (dev)
-DB_ENV = os.environ.get('DATABASE_URL')
-if DB_ENV:
-    DATABASE_URL = DB_ENV
-else:
-    BASE_DIR = os.path.dirname(__file__)
-    DATABASE_URL = f"sqlite:///{os.path.join(BASE_DIR, 'usuarios.db')}"
-
-# Para SQLite necesitamos un argumento adicional
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-
-engine = create_engine(DATABASE_URL, echo=False, future=True, pool_pre_ping=True, connect_args=connect_args)
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
-Base = declarative_base()
-
-# ---------- MODELOS ----------
-class Usuario(Base):
-    __tablename__ = 'usuarios'
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String, nullable=False)
-    rut = Column(String, unique=True, nullable=False, index=True)
-    saldo = Column(Integer, default=200)
-
-class Historial(Base):
-    __tablename__ = 'historial'
-    id = Column(Integer, primary_key=True, index=True)
-    rut = Column(String, nullable=False, index=True)
-    tipo = Column(String, nullable=False)
-    cantidad = Column(Integer, nullable=False)
-    fecha = Column(String, nullable=False)  # ISO string
-
-# Crea tablas si no existen
-Base.metadata.create_all(bind=engine)
-
-# ---------- APP ----------
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-def json_response(payload, status=200):
-    resp = make_response(jsonify(payload), status)
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Credentials"] = "true"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
-    return resp
+# Configuración de la conexión a Neon PostgreSQL
+DB_HOST = os.environ.get('DB_HOST')
+DB_NAME = os.environ.get('DB_NAME')
+DB_USER = os.environ.get('DB_USER')
+DB_PASSWORD = os.environ.get('DB_PASSWORD')
+DB_PORT = os.environ.get('DB_PORT', 5432)
 
-# ---------- RUTAS ----------
+def get_db_connection():
+    conn = psycopg2.connect(
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        port=DB_PORT
+    )
+    return conn
+
+def cors_response(data, status=200):
+    response = make_response(jsonify(data), status)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return response
+
 @app.route('/consultar', methods=['POST', 'OPTIONS'])
-def consultar():
-    if request.method == 'OPTIONS':
-        return json_response({}, 204)
-    data = request.get_json() or {}
-    rut = data.get('rut')
-    if not rut:
-        return json_response({'error': 'RUT no proporcionado'}, 400)
-
-    with SessionLocal() as db:
-        usuario = db.query(Usuario).filter(Usuario.rut == rut).first()
-        if not usuario:
-            return json_response({'error': 'RUT no encontrado'}, 404)
-
-        historial_rows = db.query(Historial).filter(Historial.rut == rut).order_by(Historial.fecha.desc()).all()
-        historial_data = [{'tipo': h.tipo, 'cantidad': h.cantidad, 'fecha': h.fecha} for h in historial_rows]
-
-        return json_response({'nombre': usuario.nombre, 'saldo': usuario.saldo, 'historial': historial_data})
-
 @app.route('/registrar_impresion', methods=['POST', 'OPTIONS'])
-def registrar_impresion():
-    if request.method == 'OPTIONS':
-        return json_response({}, 204)
-    data = request.get_json() or {}
-    rut = data.get('rut')
-    paginas = data.get('paginas')
-    if not rut or paginas is None:
-        return json_response({'error': 'Datos incompletos'}, 400)
-
-    try:
-        paginas = int(paginas)
-    except (ValueError, TypeError):
-        return json_response({'error': 'Páginas debe ser un número'}, 400)
-    if paginas <= 0:
-        return json_response({'error': 'Páginas debe ser mayor que 0'}, 400)
-
-    with SessionLocal() as db:
-        usuario = db.query(Usuario).filter(Usuario.rut == rut).first()
-        if not usuario:
-            return json_response({'error': 'Usuario no encontrado'}, 404)
-        if paginas > usuario.saldo:
-            return json_response({'error': 'Saldo insuficiente'}, 400)
-
-        usuario.saldo = usuario.saldo - paginas
-        h = Historial(rut=rut, tipo='impresion', cantidad=paginas, fecha=datetime.utcnow().isoformat())
-        db.add(h)
-        db.add(usuario)
-        db.commit()
-        db.refresh(usuario)
-        return json_response({'mensaje': 'Impresión registrada', 'nuevo_saldo': usuario.saldo})
-
 @app.route('/cargar_usuario', methods=['POST', 'OPTIONS'])
-def cargar_usuario():
+def handle_requests():
     if request.method == 'OPTIONS':
-        return json_response({}, 204)
-    data = request.get_json() or {}
-    nombre = data.get('nombre')
-    rut = data.get('rut')
-    paginas = data.get('paginas')
-    if not all([nombre, rut, paginas is not None]):
-        return json_response({'error': 'Faltan datos'}, 400)
-    try:
-        paginas = int(paginas)
-    except (ValueError, TypeError):
-        return json_response({'error': 'Paginas debe ser entero'}, 400)
-    if paginas <= 0:
-        return json_response({'error': 'Paginas debe ser mayor que 0'}, 400)
+        return cors_response({}, 204)
 
-    with SessionLocal() as db:
-        usuario = db.query(Usuario).filter(Usuario.rut == rut).first()
-        if usuario:
-            usuario.saldo = usuario.saldo + paginas
-            mensaje = f'Saldo actualizado para {usuario.nombre}'
+    data = request.get_json()
+    rut = data.get('rut')
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if request.path == '/consultar':
+        if not rut:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'RUT no proporcionado'}, 400)
+
+        cursor.execute("SELECT id, nombre, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
+        user = cursor.fetchone()
+
+        if not user:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'RUT no encontrado'}, 404)
+
+        user_id, nombre, saldo = user
+
+        cursor.execute(
+            "SELECT tipo, paginas, fecha FROM historial_impresiones WHERE usuario_id = %s ORDER BY fecha DESC",
+            (user_id,)
+        )
+        historial = cursor.fetchall()
+        historial_data = [{'tipo': t, 'cantidad': p, 'fecha': f.isoformat()} for t, p, f in historial]
+
+        cursor.close()
+        conn.close()
+
+        return cors_response({'nombre': nombre, 'saldo': saldo, 'historial': historial_data})
+
+    elif request.path == '/registrar_impresion':
+        paginas = data.get('paginas')
+        if not rut or paginas is None:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'Datos incompletos'}, 400)
+        try:
+            paginas = int(paginas)
+        except ValueError:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'Páginas debe ser un número'}, 400)
+
+        cursor.execute("SELECT id, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
+        user = cursor.fetchone()
+        if not user:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'Usuario no encontrado'}, 404)
+
+        user_id, saldo = user
+
+        if paginas > saldo:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'Saldo insuficiente'}, 400)
+
+        nuevo_saldo = saldo - paginas
+        cursor.execute("UPDATE usuarios SET saldo_paginas = %s WHERE id = %s", (nuevo_saldo, user_id))
+        cursor.execute(
+            "INSERT INTO historial_impresiones (usuario_id, tipo, paginas, fecha) VALUES (%s, %s, %s, %s)",
+            (user_id, 'impresion', paginas, datetime.now())
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return cors_response({'mensaje': 'Impresión registrada', 'nuevo_saldo': nuevo_saldo})
+
+    elif request.path == '/cargar_usuario':
+        nombre = data.get('nombre')
+        paginas = data.get('paginas')
+        if not all([nombre, rut, paginas]):
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'Faltan datos'}, 400)
+        try:
+            paginas = int(paginas)
+        except ValueError:
+            cursor.close()
+            conn.close()
+            return cors_response({'error': 'Paginas debe ser entero'}, 400)
+
+        cursor.execute("SELECT id, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
+        user = cursor.fetchone()
+        if user:
+            user_id, saldo = user
+            nuevo_saldo = saldo + paginas
+            cursor.execute("UPDATE usuarios SET saldo_paginas = %s WHERE id = %s", (nuevo_saldo, user_id))
         else:
-            usuario = Usuario(nombre=nombre, rut=rut, saldo=paginas)
-            db.add(usuario)
-            mensaje = f'Saldo cargado exitosamente para {nombre}'
-        h = Historial(rut=rut, tipo='recarga', cantidad=paginas, fecha=datetime.utcnow().isoformat())
-        db.add(h)
-        db.commit()
-        return json_response({'mensaje': mensaje})
+            cursor.execute(
+                "INSERT INTO usuarios (nombre, rut, saldo_paginas) VALUES (%s, %s, %s)",
+                (nombre, rut, paginas)
+            )
+            nuevo_saldo = paginas
+            # Obtener el nuevo id insertado para historial
+            cursor.execute("SELECT id FROM usuarios WHERE rut = %s", (rut,))
+            user_id = cursor.fetchone()[0]
+
+        cursor.execute(
+            "INSERT INTO historial_impresiones (usuario_id, tipo, paginas, fecha) VALUES (%s, %s, %s, %s)",
+            (user_id, 'recarga', paginas, datetime.now())
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return cors_response({'mensaje': f'Saldo cargado exitosamente para {nombre}'})
 
 @app.route('/get_usuarios', methods=['GET'])
 def get_usuarios():
-    with SessionLocal() as db:
-        users = db.query(Usuario).all()
-        usuarios = [{'nombre': u.nombre, 'rut': u.rut, 'saldo': u.saldo} for u in users]
-    return json_response({'usuarios': usuarios})
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT nombre, rut, saldo_paginas FROM usuarios")
+    rows = cursor.fetchall()
+    usuarios = [{'nombre': r[0], 'rut': r[1], 'saldo': r[2]} for r in rows]
+    cursor.close()
+    conn.close()
+    return cors_response({'usuarios': usuarios})
 
-# ---------- RUN ----------
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=10000)
