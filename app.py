@@ -7,22 +7,21 @@ from datetime import datetime
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
-# Configuración de la conexión a Neon PostgreSQL
-DB_HOST = os.environ.get('DB_HOST')
-DB_NAME = os.environ.get('DB_NAME')
-DB_USER = os.environ.get('DB_USER')
-DB_PASSWORD = os.environ.get('DB_PASSWORD')
-DB_PORT = os.environ.get('DB_PORT', 5432)
+# Variables de conexión - reemplaza con tus datos Neon
+DB_HOST = os.getenv("DB_HOST", "tu_host_neon")
+DB_NAME = os.getenv("DB_NAME", "tu_basedatos")
+DB_USER = os.getenv("DB_USER", "tu_usuario")
+DB_PASS = os.getenv("DB_PASS", "tu_password")
+DB_PORT = os.getenv("DB_PORT", "5432")
 
-def get_db_connection():
-    conn = psycopg2.connect(
+def get_connection():
+    return psycopg2.connect(
         host=DB_HOST,
-        database=DB_NAME,
+        dbname=DB_NAME,
         user=DB_USER,
-        password=DB_PASSWORD,
+        password=DB_PASS,
         port=DB_PORT
     )
-    return conn
 
 def cors_response(data, status=200):
     response = make_response(jsonify(data), status)
@@ -41,36 +40,29 @@ def handle_requests():
     data = request.get_json()
     rut = data.get('rut')
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+    except Exception as e:
+        return cors_response({'error': f'Error de conexión a BD: {str(e)}'}, 500)
 
     if request.path == '/consultar':
         if not rut:
-            cursor.close()
-            conn.close()
             return cors_response({'error': 'RUT no proporcionado'}, 400)
-
-        cursor.execute("SELECT id, nombre, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
-        user = cursor.fetchone()
-
-        if not user:
+        cursor.execute("SELECT nombre, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
+        res = cursor.fetchone()
+        if not res:
             cursor.close()
             conn.close()
             return cors_response({'error': 'RUT no encontrado'}, 404)
 
-        user_id, nombre, saldo = user
-
-        cursor.execute(
-            "SELECT tipo, paginas, fecha FROM historial_impresiones WHERE usuario_id = %s ORDER BY fecha DESC",
-            (user_id,)
-        )
+        cursor.execute("SELECT tipo, cantidad, fecha FROM historial WHERE rut = %s ORDER BY fecha DESC", (rut,))
         historial = cursor.fetchall()
-        historial_data = [{'tipo': t, 'cantidad': p, 'fecha': f.isoformat()} for t, p, f in historial]
+        historial_data = [{'tipo': t, 'cantidad': c, 'fecha': f.isoformat()} for t, c, f in historial]
 
         cursor.close()
         conn.close()
-
-        return cors_response({'nombre': nombre, 'saldo': saldo, 'historial': historial_data})
+        return cors_response({'nombre': res[0], 'saldo': res[1], 'historial': historial_data})
 
     elif request.path == '/registrar_impresion':
         paginas = data.get('paginas')
@@ -85,25 +77,22 @@ def handle_requests():
             conn.close()
             return cors_response({'error': 'Páginas debe ser un número'}, 400)
 
-        cursor.execute("SELECT id, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
-        user = cursor.fetchone()
-        if not user:
+        cursor.execute("SELECT saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
+        res = cursor.fetchone()
+        if not res:
             cursor.close()
             conn.close()
             return cors_response({'error': 'Usuario no encontrado'}, 404)
-
-        user_id, saldo = user
-
+        saldo = res[0]
         if paginas > saldo:
             cursor.close()
             conn.close()
             return cors_response({'error': 'Saldo insuficiente'}, 400)
-
         nuevo_saldo = saldo - paginas
-        cursor.execute("UPDATE usuarios SET saldo_paginas = %s WHERE id = %s", (nuevo_saldo, user_id))
+        cursor.execute("UPDATE usuarios SET saldo_paginas = %s WHERE rut = %s", (nuevo_saldo, rut))
         cursor.execute(
-            "INSERT INTO historial_impresiones (usuario_id, tipo, paginas, fecha) VALUES (%s, %s, %s, %s)",
-            (user_id, 'impresion', paginas, datetime.now())
+            "INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (%s, %s, %s, %s)",
+            (rut, 'impresion', paginas, datetime.now())
         )
         conn.commit()
         cursor.close()
@@ -124,25 +113,19 @@ def handle_requests():
             conn.close()
             return cors_response({'error': 'Paginas debe ser entero'}, 400)
 
-        cursor.execute("SELECT id, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
-        user = cursor.fetchone()
-        if user:
-            user_id, saldo = user
-            nuevo_saldo = saldo + paginas
-            cursor.execute("UPDATE usuarios SET saldo_paginas = %s WHERE id = %s", (nuevo_saldo, user_id))
+        cursor.execute("SELECT saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
+        res = cursor.fetchone()
+        if res:
+            nuevo_saldo = res[0] + paginas
+            cursor.execute("UPDATE usuarios SET saldo_paginas = %s WHERE rut = %s", (nuevo_saldo, rut))
         else:
             cursor.execute(
                 "INSERT INTO usuarios (nombre, rut, saldo_paginas) VALUES (%s, %s, %s)",
                 (nombre, rut, paginas)
             )
-            nuevo_saldo = paginas
-            # Obtener el nuevo id insertado para historial
-            cursor.execute("SELECT id FROM usuarios WHERE rut = %s", (rut,))
-            user_id = cursor.fetchone()[0]
-
         cursor.execute(
-            "INSERT INTO historial_impresiones (usuario_id, tipo, paginas, fecha) VALUES (%s, %s, %s, %s)",
-            (user_id, 'recarga', paginas, datetime.now())
+            "INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (%s, %s, %s, %s)",
+            (rut, 'recarga', paginas, datetime.now())
         )
         conn.commit()
         cursor.close()
@@ -151,14 +134,18 @@ def handle_requests():
 
 @app.route('/get_usuarios', methods=['GET'])
 def get_usuarios():
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT nombre, rut, saldo_paginas FROM usuarios")
-    rows = cursor.fetchall()
-    usuarios = [{'nombre': r[0], 'rut': r[1], 'saldo': r[2]} for r in rows]
-    cursor.close()
-    conn.close()
-    return cors_response({'usuarios': usuarios})
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT nombre, rut, saldo_paginas FROM usuarios")
+        rows = cursor.fetchall()
+        usuarios = [{'nombre': r[0], 'rut': r[1], 'saldo': r[2]} for r in rows]
+        cursor.close()
+        conn.close()
+        return cors_response({'usuarios': usuarios})
+    except Exception as e:
+        return cors_response({'error': f'Error de conexión a BD: {str(e)}'}, 500)
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000)
