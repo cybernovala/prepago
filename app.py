@@ -24,7 +24,7 @@ def consultar():
     try:
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("SELECT nombre, saldo FROM usuarios WHERE rut = %s", (rut,))
+        cur.execute("SELECT nombre, saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
         res = cur.fetchone()
         if not res:
             cur.close()
@@ -60,7 +60,7 @@ def registrar_impresion():
     try:
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("SELECT saldo FROM usuarios WHERE rut = %s", (rut,))
+        cur.execute("SELECT saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
         res = cur.fetchone()
         if not res:
             cur.close()
@@ -74,7 +74,7 @@ def registrar_impresion():
             return _corsify_response(jsonify({'error': 'Saldo insuficiente'}), 400)
 
         nuevo_saldo = saldo - paginas
-        cur.execute("UPDATE usuarios SET saldo = %s WHERE rut = %s", (nuevo_saldo, rut))
+        cur.execute("UPDATE usuarios SET saldo_paginas = %s WHERE rut = %s", (nuevo_saldo, rut))
         cur.execute("INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (%s, %s, %s, %s)",
                     (rut, 'impresion', paginas, datetime.now()))
         conn.commit()
@@ -104,14 +104,14 @@ def cargar_usuario():
     try:
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("SELECT saldo FROM usuarios WHERE rut = %s", (rut,))
+        cur.execute("SELECT saldo_paginas FROM usuarios WHERE rut = %s", (rut,))
         res = cur.fetchone()
         if res:
             nuevo_saldo = res[0] + paginas
-            cur.execute("UPDATE usuarios SET saldo = %s WHERE rut = %s", (nuevo_saldo, rut))
+            cur.execute("UPDATE usuarios SET saldo_paginas = %s WHERE rut = %s", (nuevo_saldo, rut))
         else:
             nuevo_saldo = paginas
-            cur.execute("INSERT INTO usuarios (nombre, rut, saldo) VALUES (%s, %s, %s)", (nombre, rut, paginas))
+            cur.execute("INSERT INTO usuarios (nombre, rut, saldo_paginas) VALUES (%s, %s, %s)", (nombre, rut, paginas))
 
         cur.execute("INSERT INTO historial (rut, tipo, cantidad, fecha) VALUES (%s, %s, %s, %s)",
                     (rut, 'recarga', paginas, datetime.now()))
@@ -127,7 +127,7 @@ def get_usuarios():
     try:
         conn = get_conn()
         cur = conn.cursor()
-        cur.execute("SELECT nombre, rut, saldo FROM usuarios")
+        cur.execute("SELECT nombre, rut, saldo_paginas FROM usuarios")
         rows = cur.fetchall()
         usuarios = [{'nombre': r[0], 'rut': r[1], 'saldo': r[2]} for r in rows]
         cur.close()
