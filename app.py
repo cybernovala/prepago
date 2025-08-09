@@ -29,7 +29,7 @@ def consultar():
         if not res:
             cur.close()
             conn.close()
-            return _corsify_response(jsonify({'error': 'RUT no encontrado'}), 404)
+            return _corsify_response(jsonify({'error': 'RUT no encontrado, asegurate de ingresar el formato 12345678-9, o debes dirigirte a Cybernova en colo colo 512, para realizar una primera recarga y ser registrado(a)'}), 404)
 
         cur.execute("SELECT tipo, cantidad, fecha FROM historial WHERE rut = %s ORDER BY fecha DESC", (rut,))
         historial = cur.fetchall()
@@ -153,3 +153,4 @@ def _corsify_response(response, status=200):
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
+
