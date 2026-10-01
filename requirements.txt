@@ -1,4 +1,4 @@
 gunicorn
-psycopg2-binary
 flask
 flask-cors
+pymongo[srv]
